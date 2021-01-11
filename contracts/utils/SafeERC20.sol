@@ -1,6 +1,18 @@
+/* @audit-standard AUDITDAO
+ * @auditor cyotee
+ * @auditor-wallet 0xf28dCDF515E69da11EBd264163b09b1b30DC9dC8
+ * audit-result 
+ */
+
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+/* @warning Uses a floating pragma declaration.
+ * @summary While not a known vulnerability, using a floating pragma statement
+ *  introduces the chance that a compiler version incompatibility with the
+ *  implementation could introduce a vulnerability.
+ * @resolution Auditor changed to static pragma statement
+ */
+pragma solidity 0.8.0;
 
 import "../interfaces/IERC20.sol";
 import "./Address.sol";
@@ -32,6 +44,11 @@ library SafeERC20 {
      * Whenever possible, use {safeIncreaseAllowance} and
      * {safeDecreaseAllowance} instead.
      */
+    /*
+      * @advisory Function not used
+      * @summary This function is not used in this code base. Function can safely be removed to minimize contract size.
+      *   Additionaly, while not a known vulnerability, bytecode that is not present can not be exploited.
+      */
     function safeApprove(IERC20 token, address spender, uint256 value) internal {
         // safeApprove should only be called when setting an initial allowance,
         // or when resetting it to zero. To increase and decrease it, use
@@ -43,11 +60,21 @@ library SafeERC20 {
         _callOptionalReturn(token, abi.encodeWithSelector(token.approve.selector, spender, value));
     }
 
+    /*
+      * @advisory Function not used
+      * @summary This function is not used in this code base. Function can safely be removed to minimize contract size.
+      * Additionaly, while not a known vulnerability, bytecode that is not present can not be exploited.
+      */
     function safeIncreaseAllowance(IERC20 token, address spender, uint256 value) internal {
         uint256 newAllowance = token.allowance(address(this), spender) + value;
         _callOptionalReturn(token, abi.encodeWithSelector(token.approve.selector, spender, newAllowance));
     }
 
+    /*
+      * @advisory Function not used
+      * @summary This function is not used in this code base. Function can safely be removed to minimize contract size.
+      * Additionaly, while not a known vulnerability, bytecode that is not present can not be exploited.
+      */
     function safeDecreaseAllowance(IERC20 token, address spender, uint256 value) internal {
         uint256 newAllowance = token.allowance(address(this), spender) - value;
         _callOptionalReturn(token, abi.encodeWithSelector(token.approve.selector, spender, newAllowance));

@@ -1,6 +1,18 @@
+/* @audit-standard AUDITDAO
+ * @auditor cyotee
+ * @auditor-wallet 0xf28dCDF515E69da11EBd264163b09b1b30DC9dC8
+ * audit-result 
+ */
+ 
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+/* @warning Uses a floating pragma declaration.
+ * @summary While not a known vulnerability, using a floating pragma statement
+ * introduces the chance that a compiler version incompatibility with the
+ * implementation could introduce a vulnerability.
+ * @resolution Auditor changed to static pragma statement
+ */
+pragma solidity 0.8.0;
 
 /**
  * @dev Contract module that helps prevent reentrant calls to a function.

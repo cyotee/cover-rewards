@@ -1,0 +1,19 @@
+== Compilation Results
+
+=== Initial Compilation Result
+
+Compiling 8 files with 0.8.0
+Compilation finished successfully
+ ·-----------------|-------------·
+ |  Contract Name  ·  Size (Kb)  │
+ ··················|··············
+ |  Address        ·       0.08  │
+ ··················|··············
+ |  BonusRewards   ·      13.47  │
+ ··················|··············
+ |  ERC20          ·       2.29  │
+ ··················|··············
+ |  Ownable        ·       0.54  │
+ ··················|··············
+ |  SafeERC20      ·       0.08  │
+ ·-----------------|-------------·

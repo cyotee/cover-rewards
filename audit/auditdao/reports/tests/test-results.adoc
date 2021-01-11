@@ -1,0 +1,73 @@
+== Test Results
+
+=== Initial Test Result
+
+(node:84384) Warning: Accessing non-existent property 'INVALID_ALT_NUMBER' of module exports inside circular dependency
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:84384) Warning: Accessing non-existent property 'INVALID_ALT_NUMBER' of module exports inside circular dependency
+ ·-----------------|-------------·
+ |  Contract Name  ·  Size (Kb)  │
+ ··················|··············
+ |  Address        ·       0.08  │
+ ··················|··············
+ |  BonusRewards   ·      13.47  │
+ ··················|··············
+ |  ERC20          ·       2.29  │
+ ··················|··············
+ |  Ownable        ·       0.54  │
+ ··················|··············
+ |  SafeERC20      ·       0.08  │
+ ·-----------------|-------------·
+
+  BonusRewards
+    √ Should deploy correctly
+    √ Should only set responders by owner
+    √ Should collectDust on random Token
+    √ Should NOT addPoolsAndAllowBonus by non-owner
+    √ Should NOT addPoolsAndAllowBonus by non-owner
+    √ Should addPoolsAndAllowBonus by owner under right condition
+    √ Should NOT collectDust on lpToken
+    √ Should addBonus by partner correctly
+    √ Should deposit lpToken for userA and userB
+    √ Should extendBonus by partner correctly
+    √ Should view minedRewards, claimRewards for userA, deposit and claim for userB
+    √ Should withdraw for userB
+    √ Should emergency withdraw for userA
+    √ Should NOT collectDust on bonusToken if active
+    √ Should NOT addBonus if not all bonusToken claimed
+    √ Should add 2nd Bonus and claim
+    √ Should addBonus if all bonusToken claimed
+
+·------------------------------------------|---------------------------|-------------|----------------------------·
+|           Solc version: 0.8.0            ·  Optimizer enabled: true  ·  Runs: 200  ·  Block limit: 6718946 gas  │
+···········································|···························|·············|·····························
+|  Methods                                                                                                        │
+·················|·························|·············|·············|·············|·············|···············
+|  Contract      ·  Method                 ·  Min        ·  Max        ·  Avg        ·  # calls    ·  eur (avg)   │
+·················|·························|·············|·············|·············|·············|···············
+|  BonusRewards  ·  addBonus               ·     190270  ·     199902  ·     195348  ·          3  ·           -  │
+·················|·························|·············|·············|·············|·············|···············
+|  BonusRewards  ·  addPoolsAndAllowBonus  ·      88917  ·     153872  ·     132220  ·          3  ·           -  │
+·················|·························|·············|·············|·············|·············|···············
+|  BonusRewards  ·  claimRewards           ·      23816  ·     211077  ·     103912  ·          7  ·           -  │
+·················|·························|·············|·············|·············|·············|···············
+|  BonusRewards  ·  collectDust            ·      28818  ·      45475  ·      39923  ·          3  ·           -  │
+·················|·························|·············|·············|·············|·············|···············
+|  BonusRewards  ·  deposit                ·     133924  ·     170532  ·     163006  ·          5  ·           -  │
+·················|·························|·············|·············|·············|·············|···············
+|  BonusRewards  ·  emergencyWithdraw      ·          -  ·          -  ·      37753  ·          2  ·           -  │
+·················|·························|·············|·············|·············|·············|···············
+|  BonusRewards  ·  extendBonus            ·          -  ·          -  ·      77830  ·          2  ·           -  │
+·················|·························|·············|·············|·············|·············|···············
+|  BonusRewards  ·  setPaused              ·      16142  ·      46007  ·      31075  ·          2  ·           -  │
+·················|·························|·············|·············|·············|·············|···············
+|  BonusRewards  ·  setResponders          ·          -  ·          -  ·      65056  ·          2  ·           -  │
+·················|·························|·············|·············|·············|·············|···············
+|  BonusRewards  ·  withdraw               ·          -  ·          -  ·     131786  ·          2  ·           -  │
+·················|·························|·············|·············|·············|·············|···············
+|  ERC20         ·  approve                ·          -  ·          -  ·      44235  ·          2  ·           -  │
+·················|·························|·············|·············|·············|·············|···············
+|  ERC20         ·  mint                   ·          -  ·          -  ·      50796  ·          1  ·           -  │
+·----------------|-------------------------|-------------|-------------|-------------|-------------|--------------·
+
+  17 passing (21s)

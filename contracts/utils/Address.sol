@@ -1,6 +1,17 @@
+/* @audit-standard AUDITDAO
+ * @auditor cyotee
+ * @auditor-wallet 0xf28dCDF515E69da11EBd264163b09b1b30DC9dC8
+ * audit-result 
+ */
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+/* @warning Uses a floating pragma declaration.
+ * @summary While not a known vulnerability, using a floating pragma statement
+ *  introduces the chance that a compiler version incompatibility with the
+ *  implementation could introduce a vulnerability.
+ * @resolution Auditor changed to static pragma statement
+ */
+pragma solidity 0.8.0;
 
 library Address {
     /**
@@ -20,6 +31,12 @@ library Address {
      *  - an address where a contract lived, but was destroyed
      * ====
      */
+
+     /*
+      * @advisory Function not used
+      * @summary This function is not used in this code base. Function can safely be removed to minimize contract size.
+      *   Additionaly, while not a known vulnerability, bytecode that is not present can not be exploited.
+      */
     function isContract(address account) internal view returns (bool) {
         // According to EIP-1052, 0x0 is the value returned for not-yet created accounts
         // and 0xc5d2460186f7233c927e7db2dcc703c0e500b653ca82273b7bfad8045d85a470 is returned
@@ -47,6 +64,12 @@ library Address {
      * {ReentrancyGuard} or the
      * https://solidity.readthedocs.io/en/v0.5.11/security-considerations.html#use-the-checks-effects-interactions-pattern[checks-effects-interactions pattern].
      */
+
+     /*
+      * @advisory Function not used
+      * @summary This function is not used in this code base. Function can safely be removed to minimize contract size.
+      *   Additionaly, while not a known vulnerability, bytecode that is not present can not be exploited.
+      */
     function sendValue(address payable recipient, uint256 amount) internal {
         require(address(this).balance >= amount, "Address: insufficient balance");
 
@@ -73,6 +96,12 @@ library Address {
      *
      * _Available since v3.1._
      */
+
+     /*
+      * @advisory Function not used
+      * @summary This function is not used in this code base. Function can safely be removed to minimize contract size.
+      * Additionaly, while not a known vulnerability, bytecode that is not present an not be exploited.
+      */
     function functionCall(address target, bytes memory data) internal returns (bytes memory) {
       return functionCall(target, data, "Address: low-level call failed");
     }
@@ -98,6 +127,11 @@ library Address {
      *
      * _Available since v3.1._
      */
+    /*
+      * @advisory Function not used
+      * @summary This function is not used in this code base. Function can safely be removed to minimize contract size.
+      * Additionaly, while not a known vulnerability, bytecode that is not present an not be exploited.
+      */
     function functionCallWithValue(address target, bytes memory data, uint256 value) internal returns (bytes memory) {
         return functionCallWithValue(target, data, value, "Address: low-level call with value failed");
     }
@@ -108,6 +142,11 @@ library Address {
      *
      * _Available since v3.1._
      */
+    /*
+      * @advisory Function not used
+      * @summary This function is not used in this code base. Function can safely be removed to minimize contract size.
+      * Additionaly, while not a known vulnerability, bytecode that is not present an not be exploited.
+      */
     function functionCallWithValue(address target, bytes memory data, uint256 value, string memory errorMessage) internal returns (bytes memory) {
         require(address(this).balance >= value, "Address: insufficient balance for call");
         return _functionCallWithValue(target, data, value, errorMessage);

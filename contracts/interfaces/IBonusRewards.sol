@@ -1,6 +1,22 @@
+/* @audit-standard AUDITDAO
+ * @auditor cyotee
+ * @auditor-wallet 0xf28dCDF515E69da11EBd264163b09b1b30DC9dC8
+ * audit-result 
+ */
+
+/*
+ * @advisory Should have clearly defined software license.
+ *  Available identifiers are available at https://spdx.org/licenses/
+ */
 // SPDX-License-Identifier: NONE
 
-pragma solidity ^0.8.0;
+/* @warning Uses a floating pragma declaration.
+ * @summary While not a known vulnerability, using a floating pragma statement
+ *  introduces the chance that a compiler version incompatibility with the
+ *  implementation could introduce a vulnerability.
+ * @resolution Auditor changed to static pragma statement
+ */
+pragma solidity 0.8.0;
 
 /**
  * @title Cover Protocol Bonus Token Rewards Interface
@@ -10,6 +26,11 @@ interface IBonusRewards {
   event Deposit(address indexed user, address indexed lpToken, uint256 amount);
   event Withdraw(address indexed user, address indexed lpToken, uint256 amount);
 
+  /*
+   * @optional
+   * @advisory Should implement functions to standardize state change.
+   * @summary Standardizing state change operations with functions ensures consist operations.
+   */
   struct Bonus {
     address bonusTokenAddr; // the external bonus token, like CRV
     uint256 startTime;
@@ -19,11 +40,21 @@ interface IBonusRewards {
     uint256 remBonus; // remaining bonus in contract
   }
 
+  /*
+   * @optional
+   * @advisory Should implement functions to standardize state change.
+   * @summary Standardizing state change operations with functions ensures consist operations.
+   */
   struct Pool {
     Bonus[] bonuses;
     uint256 lastUpdatedAt; // last accumulated bonus update timestamp
   }
 
+  /*
+   * @optional
+   * @advisory Should implement functions to standardize state change.
+   * @summary Standardizing state change operations with functions ensures consist operations.
+   */
   struct User {
     uint256 amount;
     uint256[] rewardsWriteoffs; // the amount of bonus tokens to write off when calculate rewards from last update

@@ -1,6 +1,8 @@
 require("@nomiclabs/hardhat-waffle");
 require('hardhat-contract-sizer');
 require('@nomiclabs/hardhat-etherscan');
+require("hardhat-gas-reporter");
+require("solidity-coverage");
 
 require('dotenv').config();
 
@@ -24,7 +26,7 @@ module.exports = {
     enabled: true,
     runs: 200,
   },
-  // defaultNetwork: "hardhat",
+  defaultNetwork: "hardhat",
   etherscan: {
     apiKey: process.env.ETHERSCAN_API_KEY
   },

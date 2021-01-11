@@ -1,6 +1,21 @@
+/* @audit-standard AUDITDAO
+ * @auditor cyotee
+ * @auditor-wallet 0xf28dCDF515E69da11EBd264163b09b1b30DC9dC8
+ * audit-result 
+ */
+/*
+ * @advisory Should have clearly defined software license.
+ * Available identifiers are available at https://spdx.org/licenses/
+ */
 // SPDX-License-Identifier: NONE
 
-pragma solidity ^0.8.0;
+/* @warning Uses a floating pragma declaration.
+ * @summary While not a known vulnerability, using a floating pragma statement
+ * introduces the chance that a compiler version incompatibility with the
+ * implementation could introduce a vulnerability.
+ * @resolution Auditor changed to static pragma statement
+ */
+pragma solidity 0.8.0;
 
 import "./utils/Ownable.sol";
 import "./utils/ReentrancyGuard.sol";
@@ -29,19 +44,39 @@ contract BonusRewards is IBonusRewards, Ownable, ReentrancyGuard {
   // bonusTokenAddr => 1, used to avoid collecting bonus token when not ready
   mapping(address => uint8) private bonusTokenAddrMap;
 
+  /*
+   * @safe State check modifier does not change state.
+   * @summary Code that checks state are generally safe.
+   */
   modifier notPaused() {
     require(!paused, "BonusRewards: paused");
     _;
   }
 
+  /*
+   * @safe View functions can not change state.
+   * @summary the "view" function property prevents modification of state.
+   * @safe No calculation made.
+   * @summary Functions to do not make calculations and simply provide state data are generally safe.
+   */
   function getPoolList() external view override returns (address[] memory) {
     return poolList;
   }
 
+  /*
+   * @safe View functions can not change state.
+   * @summary the "view" function property prevents modification of state.
+   * @safe No calculation made.
+   * @summary Functions to do not make calculations and simply provide state data are generally safe.
+   */
   function getPool(address _lpToken) external view override returns (Pool memory) {
     return pools[_lpToken];
   }
 
+  /*
+   * @safe View functions can not change state.
+   * @summary the "view" function property prevents modification of state.
+   */
   function viewRewards(address _lpToken, address _user) public view override returns (uint256[] memory) {
     Pool memory pool = pools[_lpToken];
     User memory user = users[_lpToken][_user];
@@ -62,19 +97,62 @@ contract BonusRewards is IBonusRewards, Ownable, ReentrancyGuard {
     return rewards;
   }
 
+  /*
+   * @safe View functions can not change state.
+   * @summary the "view" function property prevents modification of state.
+   * @safe No calculation made.
+   * @summary Functions to do not make calculations and simply provide state data are generally safe.
+   */
   function getUser(address _lpToken, address _account) external view override returns (User memory, uint256[] memory) {
     return (users[_lpToken][_account], viewRewards(_lpToken, _account));
   }
 
+  /*
+   * @safe View functions can not change state.
+   * @summary the "view" function property prevents modification of state.
+   * @safe No calculation made.
+   * @summary Functions to do not make calculations and simply provide state data are generally safe.
+   */
   function getAuthorizers(address _bonusTokenAddr) external view override returns (address[] memory) {
     return allowedTokenAuthorizers[_bonusTokenAddr];
   }
 
+  /*
+   * @safe View functions can not change state.
+   * @summary the "view" function property prevents modification of state.
+   * @safe No calculation made.
+   * @summary Functions to do not make calculations and simply provide state data are generally safe.
+   */
   function getResponders() external view override returns (address[] memory) {
     return responders;
   }
 
   /// @notice update pool's bonus per staked token till current block timestamp
+  /*
+   * @advisory Unessecary extention of attack surface.
+   * @summary Upon review, there seems to be no need for this function to be public.
+   *  Reducing the number of public functions narrows the attack surface of potentially explotable logic.
+   */
+  // CONDITIONAL ASSESSMENT PENDING FUTHER REVIEW. UNLIKELY TO BE EXPLOITABLE.
+  // BEST PRACTICE IS TO USE A ACL OF APPROVED ADDRESSES FOR _lpToken
+  /*
+   * @unsafe Conditional state not updated until conditional operation completed.
+   * @summary The variable pool.lastUpdatedAt is not updated until after the operation contingent 
+   *  upon pool.lastUpdatedAt is completed. Because this function is public,
+   *  and not protected against reentrancy.
+   * @note Exploitability is based on usage of balanceOf function on _lpToken. This function is only unsafe
+   *  if a unverified address that implements a malicious balanceOf function. This is not mitigated by the conditional return
+   *  due to the fact that the default value of pool.lastUpdatedAt of a Pool retrieved for an address not previously saved
+   *  would be 0. Since the block.timestamp can't be equal to or less then 0 then the conditional return would always
+   *  evaluate to true.
+   * @resolution
+   *  @primary Added ACL for approved address for _lpToken
+   *  @primary Reorder logic to set new variable to pool.lastUpdatedAt, update value of pool.lastUpdatedAt
+   *    to block.timestamp. The base calculation off new variable.
+   *  @primary Add require statement checking ACL of addresses. EnumerableSet.AddressSet would do this.
+   *  @secondary Move to internal function to limit interaction by integrating with other transactions that
+   *    will control flow organically.
+   */
   function updatePool(address _lpToken) public override {
     Pool storage pool = pools[_lpToken];
     if (block.timestamp <= pool.lastUpdatedAt) return;
@@ -94,6 +172,21 @@ contract BonusRewards is IBonusRewards, Ownable, ReentrancyGuard {
     pool.lastUpdatedAt = block.timestamp;
   }
 
+  // CONDITIONAL ASSESSMENT PENDING FUTHER REVIEW. UNLIKELY TO BE EXPLOITABLE.
+  // BEST PRACTICE IS TO USE A ACL OF APPROVED ADDRESSES FOR _lpToken
+  /*
+   * @unsafe Conditional state not updated until conditional operation completed in internally called function.
+   * @summary The variable pool.lastUpdatedAt is not updated until after the operation contingent 
+   *  upon pool.lastUpdatedAt is completed. Because this function is public, 
+   *  and not protected against reentrancy this could be exploited to accrue additional rewards.
+   *  This exploit is unlikely as the "if (bonusSinceLastUpdate > 0)" clause should prevent this.
+   * @resolution
+   *  @primary Added ACL for approved address for _lpToken
+   *  @primary Reorder logic to set new variable to pool.lastUpdatedAt, update value of pool.lastUpdatedAt
+   *    to block.timestamp. The base calculation off new variable. 
+   *  @secondary Move to internal function to limit interaction by integrating with other transactions that
+   *    will control flow organically.
+   */
   function claimRewards(address _lpToken) public override {
     User memory user = users[_lpToken][msg.sender];
     if (user.amount == 0) return;
@@ -103,12 +196,34 @@ contract BonusRewards is IBonusRewards, Ownable, ReentrancyGuard {
     _updateUserWriteoffs(_lpToken);
   }
 
+  /*
+   * @safe
+   * @summary While claimRewards(address) is exploitable this function executes with a strictly controlled flow.
+   * Even if the same _lpTokens value is placed in the array multiple times, the looping would prevent that from
+   * exploiting to accrue additional rewards.
+   */
   function claimRewardsForPools(address[] calldata _lpTokens) external override {
     for (uint256 i = 0; i < _lpTokens.length; i++) {
       claimRewards(_lpTokens[i]);
     }
   }
 
+  // CONDITIONAL ASSESSMENT PENDING FUTHER REVIEW. UNLIKELY TO BE EXPLOITABLE.
+  // BEST PRACTICE IS TO USE A ACL OF APPROVED ADDRESSES FOR _lpToken
+  /*
+   * @unsafe Conditional state not updated until conditional operation completed in internally called function.
+   * @summary The variable pool.lastUpdatedAt is not updated until after the operation contingent 
+   *  upon pool.lastUpdatedAt is completed. Because this function is public, 
+   *  and not protected against reentrancy this could be exploited to accrue additional rewards.
+   *  The clause "require(pools[_lpToken].lastUpdatedAt > 0, "Blacksmith: pool does not exists");" does not provide
+   *  and effective implicit ACL as the value lastUpdatedAt could be forced to update to a value greater then 0.
+   * @resolution
+   *  @primary Added ACL for approved address for _lpToken
+   *  @primary Reorder logic to set new variable to pool.lastUpdatedAt, update value of pool.lastUpdatedAt
+   *    to block.timestamp. The base calculation off new variable. 
+   *  @secondary Move updatePool(address) to internal function to limit interaction by integrating with other transactions that
+   *    will control flow organically.
+   */
   function deposit(address _lpToken, uint256 _amount) external override nonReentrant notPaused {
     require(pools[_lpToken].lastUpdatedAt > 0, "Blacksmith: pool does not exists");
     require(IERC20(_lpToken).balanceOf(msg.sender) >= _amount, "Blacksmith: insufficient balance");
@@ -124,6 +239,23 @@ contract BonusRewards is IBonusRewards, Ownable, ReentrancyGuard {
   }
 
   /// @notice withdraw up to all user deposited
+  // CONDITIONAL ASSESSMENT PENDING FUTHER REVIEW. UNLIKELY TO BE EXPLOITABLE.
+  // BEST PRACTICE IS TO USE A ACL OF APPROVED ADDRESSES FOR _lpToken
+  // THIS COULD BE DONE WITH EITHER ENUMERABLESET.ADDRESSSET.CONTAINS(ADDRESS) OR A of mapping( address => bool ) approvedPools.
+  /*
+   * @unsafe Conditional state in updatePool(address) not updated until conditional operation completed in internally called function.
+   * @summary The variable pool.lastUpdatedAt is not updated until after the operation contingent 
+   *  upon pool.lastUpdatedAt is completed. Because this function is public, 
+   *  and not protected against reentrancy this could be exploited to accrue additional rewards.
+   *  The clause "require(pools[_lpToken].lastUpdatedAt > 0, "Blacksmith: pool does not exists");" does not provide
+   *  and effective implicit ACL as the value lastUpdatedAt could be forced to update to a value greater then 0.
+   * @resolution
+   *  @primary Added ACL for approved address for _lpToken
+   *  @primary Reorder logic to set new variable to pool.lastUpdatedAt, update value of pool.lastUpdatedAt
+   *    to block.timestamp. The base calculation off new variable. 
+   *  @secondary Move updatePool(address) to internal function to limit interaction by integrating with other transactions that
+   *    will control flow organically.
+   */
   function withdraw(address _lpToken, uint256 _amount) external override nonReentrant notPaused {
     updatePool(_lpToken);
 
@@ -138,6 +270,11 @@ contract BonusRewards is IBonusRewards, Ownable, ReentrancyGuard {
   }
 
   /// @notice withdraw all without rewards
+  /*
+   * @safe
+   * @summary Simple logic that copies stored variable to temporary variable to enable setting storage variable
+   *  to 0 prior to using temporary variable for transfer. This is inherent;y reentrancy resistant.
+   */
   function emergencyWithdraw(address _lpToken) external override nonReentrant {
     User storage user = users[_lpToken][msg.sender];
     uint256 amount = user.amount;
@@ -147,6 +284,14 @@ contract BonusRewards is IBonusRewards, Ownable, ReentrancyGuard {
   }
 
   /// @notice called by authorizers only
+  /*
+   * @ownerexploitable
+   * @summary Only an authorized user can add a Bonus. This requires trusting the authorized users.
+   *  There are not currently any design patterns that would eliminate the need for trust in this use case.
+   *  A possible solution is to enforce in code that the Bonus be tied to a token listed on Cover and has 
+   *  a met a deposit threshold. This would ensure if a illegitmate Bonus was added, it would need to also 
+   *  offer coverage. Not a complete mitigation. but would provide some protection against malicious use,
+   */
   function addBonus(
     address _lpToken,
     address _bonusTokenAddr,
@@ -187,6 +332,14 @@ contract BonusRewards is IBonusRewards, Ownable, ReentrancyGuard {
   }
 
   /// @notice extend the current bonus program, the program has to be active (endTime is in the future)
+  /*
+   * @ownerexploitable
+   * @summary Only an authorized user can add a Bonus. This requires trusting the authorized users.
+   *  There are not currently any design patterns that would eliminate the need for trust in this use case.
+   *  A possible solution is to enforce in code that the Bonus be tied to a token listed on Cover and has 
+   *  a met a deposit threshold. This would ensure if a illegitmate Bonus was added, it would need to also 
+   *  offer coverage. Not a complete mitigation. but would provide some protection against malicious use,
+   */
   function extendBonus(
     address _lpToken,
     uint256 _poolBonusId,
@@ -211,6 +364,14 @@ contract BonusRewards is IBonusRewards, Ownable, ReentrancyGuard {
   }
 
   /// @notice add pools and authorizers to add bonus tokens for pools, combine two calls into one. Only reason we add pools is when bonus tokens will be added
+  /*
+   * @ownerexploitable
+   * @summary Only an authorized user can add a Bonus. This requires trusting the authorized users.
+   *  There are not currently any design patterns that would eliminate the need for trust in this use case.
+   *  A possible solution is to enforce in code that the Bonus be tied to a token listed on Cover and has 
+   *  a met a deposit threshold. This would ensure if a illegitmate Bonus was added, it would need to also 
+   *  offer coverage. Not a complete mitigation. but would provide some protection against malicious use.
+   */
   function addPoolsAndAllowBonus(
     address[] calldata _lpTokens,
     address[] calldata _bonusTokenAddrs,
@@ -232,6 +393,11 @@ contract BonusRewards is IBonusRewards, Ownable, ReentrancyGuard {
   }
 
   /// @notice use start and end to avoid gas limit in one call
+  /*
+   * @safe
+   * @summary Simple logic that copies stored variable to temporary variable to enable setting storage variable
+   *  to 0 prior to using temporary variable for transfer. This is inherent;y reentrancy resistant.
+   */
   function updatePools(uint256 _start, uint256 _end) external override {
     address[] memory poolListCopy = poolList;
     for (uint256 i = _start; i < _end; i++) {
@@ -240,6 +406,11 @@ contract BonusRewards is IBonusRewards, Ownable, ReentrancyGuard {
   }
 
   /// @notice collect bonus token dust to treasury
+  /*
+   * @safe
+   * @summary Only an authorized user can withdraw tokens. The 1 week delay on withdrawal after the end of the program period
+   * prevents the owner from stealing funds during the program.
+   */
   function collectDust(address _token, address _lpToken, uint256 _poolBonusId) external override onlyOwner {
     require(pools[_token].lastUpdatedAt == 0, "BonusRewards: lpToken, not allowed");
 
@@ -260,10 +431,18 @@ contract BonusRewards is IBonusRewards, Ownable, ReentrancyGuard {
     }
   }
 
+  /*
+   * @ownerexploitable
+   * @summary Only an authorized user can add a responder. There is not currently a good design pattern to mitigate this.
+   */
   function setResponders(address[] calldata _responders) external override onlyOwner {
     responders = _responders;
   }
 
+  /*
+   * @ownerexploitable
+   * @summary Only an authorized user can pause rewards. There is not currently a good design pattern to mitigate this.
+   */
   function setPaused(bool _paused) external override {
     require(_isAuthorized(msg.sender, responders), "BonusRewards: caller not responder");
     paused = _paused;
@@ -283,6 +462,10 @@ contract BonusRewards is IBonusRewards, Ownable, ReentrancyGuard {
   }
 
   /// @notice tranfer upto what the contract has
+  /*
+   * @safe
+   * @summary Simple logic that ensures the last of the rewards can be collected by wrapping the SafeERC20.safeTransfer.
+   */
   function _safeTransfer(address _token, uint256 _amount) private returns (uint256 _transferred) {
     IERC20 token = IERC20(_token);
     uint256 balance = token.balanceOf(address(this));
@@ -295,6 +478,11 @@ contract BonusRewards is IBonusRewards, Ownable, ReentrancyGuard {
     }
   }
 
+  /*
+   * @safe
+   * @summary This could result in a locked contract is the checklist gets too large. This is unlikely.
+   *  Could be mitigated by using a mapping for the ACL instead.
+   */
   function _calRewardsForTime(Bonus memory _bonus, uint256 _lastUpdatedAt) internal view returns (uint256) {
     if (_bonus.endTime <= _lastUpdatedAt) return 0;
 
@@ -304,6 +492,9 @@ contract BonusRewards is IBonusRewards, Ownable, ReentrancyGuard {
     return _bonus.weeklyRewards * CAL_MULTIPLIER * timePassed / WEEK;
   }
 
+  /*
+   * @safe Logic makes consistent use of proper storage and safety functions for exeution.
+   */
   function _claimRewards(address _lpToken, User memory _user) private {
     // only claim if user has deposited before
     if (_user.amount > 0) {
@@ -321,6 +512,11 @@ contract BonusRewards is IBonusRewards, Ownable, ReentrancyGuard {
   }
 
   // only owner or authorized users from list
+  /*
+   * @unsafe
+   * @summary This could result in a locked contract is the checklist gets too large. This is unlikely.
+   *  Could be mitigated by using a mapping for the ACL instead.
+   */
   function _isAuthorized(address _addr, address[] memory checkList) private view returns (bool) {
     if (_addr == owner()) return true;
 

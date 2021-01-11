@@ -1,6 +1,24 @@
-// SPDX-License-Identifier: None
+/* @audit-standard AUDITDAO
+ * @auditor cyotee
+ * @auditor-wallet 0xf28dCDF515E69da11EBd264163b09b1b30DC9dC8
+ * audit-result 
+ */
+ /* @advisory Not likely to comply with original software license **not legl advice**
+  * @summary Code is reused from OpenZeppelin software library.
+  * The changes made are not likely signifigant enough to qualify
+  * as reimplmentation. The original MIT license requires a license
+  * and copyright notice.
+  * @resoltion Auditor change license statement to match original license.
+  */
+// SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+/* @warning Uses a floating pragma declaration.
+ * @summary While not a known vulnerability, using a floating pragma statement
+ * introduces the chance that a compiler version incompatibility with the
+ * implementation could introduce a vulnerability.
+ * @resolution Auditor changed to static pragma statement
+ */
+pragma solidity 0.8.0;
 
 /**
  * @dev Contract module which provides a basic access control mechanism, where
