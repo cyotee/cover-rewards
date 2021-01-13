@@ -4,7 +4,7 @@ Contracts for Cover Protocol bonus tokens rewards
 
 ## Development
 * run `npm install` to install all node dependencies
-* run `npm hardhat compile` to compile
+* run `npx hardhat compile` to compile
 
 ### Run Test With hardhat EVM (as [an independent node](https://hardhat.dev/hardhat-evm/#connecting-to-hardhat-evm-from-wallets-and-other-software))
 * Run `npx hardhat node` to setup a local blockchain emulator in one terminal.
@@ -16,4 +16,4 @@ Contracts for Cover Protocol bonus tokens rewards
 * Run `npx hardhat run scripts/deploy.js --network kovan`.
 * Run `npx hardhat flatten contracts/BonusRewards.sol > flat.sol` will flatten all contracts into one
 * BonusRewards
-`npx hardhat verify --network kovan 0xD2c9f9323A50C3fBf8F5E3773EeE133D39227c70`
+`npx hardhat verify --network kovan 0x06d71A19741E99fAE14b60aC7a5caef0e72BE917`

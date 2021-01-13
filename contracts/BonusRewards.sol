@@ -11,6 +11,7 @@ import "./interfaces/IBonusRewards.sol";
  * @title Cover Protocol Bonus Token Rewards contract
  * @author crypto-pumpkin
  * @notice ETH is not allowed to be an bonus token, use wETH instead
+ * @notice We support multiple bonus tokens for each pool. However, each pool will have 1 bonus token normally, may have 2 in rare cases
  */
 contract BonusRewards is IBonusRewards, Ownable, ReentrancyGuard {
   using SafeERC20 for IERC20;
@@ -18,14 +19,16 @@ contract BonusRewards is IBonusRewards, Ownable, ReentrancyGuard {
   uint256 private constant WEEK = 7 days;
   uint256 private constant CAL_MULTIPLIER = 1e12; // help calculate rewards/bonus PerToken only. 1e12 will allow meaningful $1 deposit in a $1bn pool
   bool public paused;
+  // use array to allow convinient replacement. Size of responders should be very small to 0 till a reputible responder multi-sig within DeFi or Yearn ecosystem is established
   address[] private responders;
   address[] private poolList;
   // lpToken => Pool
   mapping(address => Pool) private pools;
   // lpToken => User address => User data
   mapping(address => mapping(address => User)) private users;
-  // bonus token => [] allowed authorizers to add bonus tokens
-  mapping(address => address[]) private allowedTokenAuthorizers;
+  // use array to allow convinient replacement. Size of Authorizers should be very small (one or two partner addresses for the pool and bonus)
+  // lpToken => bonus token => [] allowed authorizers to add bonus tokens
+  mapping(address => mapping(address => address[])) private allowedTokenAuthorizers;
   // bonusTokenAddr => 1, used to avoid collecting bonus token when not ready
   mapping(address => uint8) private bonusTokenAddrMap;
 
@@ -56,7 +59,8 @@ contract BonusRewards is IBonusRewards, Ownable, ReentrancyGuard {
         uint256 bonusForTime = _calRewardsForTime(bonus, pool.lastUpdatedAt);
         uint256 bonusPerToken = bonus.accRewardsPerToken + bonusForTime / lpTotal;
         uint256 rewardsWriteoff = rewardsWriteoffsLen <= i ? 0 : user.rewardsWriteoffs[i];
-        rewards[i] = user.amount * bonusPerToken / CAL_MULTIPLIER - rewardsWriteoff;
+        uint256 reward = user.amount * bonusPerToken / CAL_MULTIPLIER - rewardsWriteoff;
+        rewards[i] = reward < bonus.remBonus ? reward : bonus.remBonus;
       }
     }
     return rewards;
@@ -66,46 +70,22 @@ contract BonusRewards is IBonusRewards, Ownable, ReentrancyGuard {
     return (users[_lpToken][_account], viewRewards(_lpToken, _account));
   }
 
-  function getAuthorizers(address _bonusTokenAddr) external view override returns (address[] memory) {
-    return allowedTokenAuthorizers[_bonusTokenAddr];
+  function getAuthorizers(address _lpToken, address _bonusTokenAddr) external view override returns (address[] memory) {
+    return allowedTokenAuthorizers[_lpToken][_bonusTokenAddr];
   }
 
   function getResponders() external view override returns (address[] memory) {
     return responders;
   }
 
-  /// @notice update pool's bonus per staked token till current block timestamp
-  function updatePool(address _lpToken) public override {
-    Pool storage pool = pools[_lpToken];
-    if (block.timestamp <= pool.lastUpdatedAt) return;
-    uint256 lpTotal = IERC20(_lpToken).balanceOf(address(this));
-    if (lpTotal == 0) {
-      pool.lastUpdatedAt = block.timestamp;
-      return;
-    }
-
-    for (uint256 i = 0; i < pool.bonuses.length; i ++) {
-      Bonus storage bonus = pool.bonuses[i];
-      if (pool.lastUpdatedAt < bonus.endTime && bonus.startTime < block.timestamp) {
-        uint256 bonusForTime = _calRewardsForTime(bonus, pool.lastUpdatedAt);
-        bonus.accRewardsPerToken = bonus.accRewardsPerToken + bonusForTime / lpTotal;
-      }
-    }
-    pool.lastUpdatedAt = block.timestamp;
-  }
-
-  function claimRewards(address _lpToken) public override {
-    User memory user = users[_lpToken][msg.sender];
-    if (user.amount == 0) return;
-
-    updatePool(_lpToken);
-    _claimRewards(_lpToken, user);
-    _updateUserWriteoffs(_lpToken);
-  }
-
-  function claimRewardsForPools(address[] calldata _lpTokens) external override {
+  function claimRewardsForPools(address[] calldata _lpTokens) external override nonReentrant notPaused {
     for (uint256 i = 0; i < _lpTokens.length; i++) {
-      claimRewards(_lpTokens[i]);
+      address _lpToken = _lpTokens[i];
+      User memory user = users[_lpToken][msg.sender];
+      if (user.amount == 0) continue;
+      _updatePool(_lpToken);
+      _claimRewards(_lpToken, user);
+      _updateUserWriteoffs(_lpToken);
     }
   }
 
@@ -113,7 +93,7 @@ contract BonusRewards is IBonusRewards, Ownable, ReentrancyGuard {
     require(pools[_lpToken].lastUpdatedAt > 0, "Blacksmith: pool does not exists");
     require(IERC20(_lpToken).balanceOf(msg.sender) >= _amount, "Blacksmith: insufficient balance");
 
-    updatePool(_lpToken);
+    _updatePool(_lpToken);
     User storage user = users[_lpToken][msg.sender];
     _claimRewards(_lpToken, user);
     user.amount = user.amount + _amount;
@@ -125,7 +105,8 @@ contract BonusRewards is IBonusRewards, Ownable, ReentrancyGuard {
 
   /// @notice withdraw up to all user deposited
   function withdraw(address _lpToken, uint256 _amount) external override nonReentrant notPaused {
-    updatePool(_lpToken);
+    require(pools[_lpToken].lastUpdatedAt > 0, "Blacksmith: pool does not exists");
+    _updatePool(_lpToken);
 
     User storage user = users[_lpToken][msg.sender];
     _claimRewards(_lpToken, user);
@@ -153,8 +134,8 @@ contract BonusRewards is IBonusRewards, Ownable, ReentrancyGuard {
     uint256 _startTime,
     uint256 _weeklyRewards,
     uint256 _transferAmount
-  ) external override notPaused {
-    require(_isAuthorized(msg.sender, allowedTokenAuthorizers[_bonusTokenAddr]), "BonusRewards: not authorized caller");
+  ) external override nonReentrant notPaused {
+    require(_isAuthorized(msg.sender, allowedTokenAuthorizers[_lpToken][_bonusTokenAddr]), "BonusRewards: not authorized caller");
     require(_startTime >= block.timestamp, "BonusRewards: startTime in the past");
 
     // make sure the pool is in the right state (exist with no active bonus at the moment) to add new bonus tokens
@@ -174,7 +155,7 @@ contract BonusRewards is IBonusRewards, Ownable, ReentrancyGuard {
     bonusTokenAddr.safeTransferFrom(msg.sender, address(this), _transferAmount);
     uint256 received = bonusTokenAddr.balanceOf(address(this)) - balanceBefore;
     // endTime is based on how much tokens transfered v.s. planned weekly rewards
-    uint256 endTime = (received / _weeklyRewards) * WEEK + _startTime;
+    uint256 endTime = received * WEEK / _weeklyRewards + _startTime;
 
     pools[_lpToken].bonuses.push(Bonus({
       bonusTokenAddr: _bonusTokenAddr,
@@ -186,14 +167,47 @@ contract BonusRewards is IBonusRewards, Ownable, ReentrancyGuard {
     }));
   }
 
+  /// @notice called by authorizers only, update weeklyRewards (if not ended), or update startTime (only if rewards not started)
+  function updateBonus(
+    address _lpToken,
+    address _bonusTokenAddr,
+    uint256 _weeklyRewards,
+    uint256 _startTime
+  ) external override nonReentrant notPaused {
+    require(_isAuthorized(msg.sender, allowedTokenAuthorizers[_lpToken][_bonusTokenAddr]), "BonusRewards: not authorized caller");
+    require(_startTime == 0 || _startTime > block.timestamp, "BonusRewards: startTime in the past");
+
+    // make sure the pool is in the right state (exist with no active bonus at the moment) to add new bonus tokens
+    Pool memory pool = pools[_lpToken];
+    require(pool.lastUpdatedAt != 0, "BonusRewards: pool does not exist");
+    Bonus[] memory bonuses = pool.bonuses;
+    for (uint256 i = 0; i < bonuses.length; i++) {
+      Bonus storage bonus = pools[_lpToken].bonuses[i];
+      if (bonuses[i].bonusTokenAddr == _bonusTokenAddr && bonus.endTime > block.timestamp) {
+        _updatePool(_lpToken); // update pool with old weeklyReward to this block
+        if (bonus.startTime > block.timestamp) {
+          // only honor new start time, if program has not started
+          if (_startTime > block.timestamp) {
+            bonus.startTime = _startTime;
+          }
+          bonus.endTime = bonus.remBonus * WEEK / _weeklyRewards  + bonus.startTime;
+        } else {
+          uint256 remBonusToDistribute = (bonus.endTime -  block.timestamp) * bonus.weeklyRewards / WEEK;
+          bonus.endTime = remBonusToDistribute * WEEK / _weeklyRewards + block.timestamp;
+        }
+        bonus.weeklyRewards = _weeklyRewards;
+      }
+    }
+  }
+
   /// @notice extend the current bonus program, the program has to be active (endTime is in the future)
   function extendBonus(
     address _lpToken,
     uint256 _poolBonusId,
     address _bonusTokenAddr,
     uint256 _transferAmount
-  ) external override notPaused {
-    require(_isAuthorized(msg.sender, allowedTokenAuthorizers[_bonusTokenAddr]), "BonusRewards: not authorized caller");
+  ) external override nonReentrant notPaused {
+    require(_isAuthorized(msg.sender, allowedTokenAuthorizers[_lpToken][_bonusTokenAddr]), "BonusRewards: not authorized caller");
 
     Bonus memory bonus = pools[_lpToken].bonuses[_poolBonusId];
     require(bonus.bonusTokenAddr == _bonusTokenAddr, "BonusRewards: bonus and id dont match");
@@ -204,7 +218,7 @@ contract BonusRewards is IBonusRewards, Ownable, ReentrancyGuard {
     bonusTokenAddr.safeTransferFrom(msg.sender, address(this), _transferAmount);
     uint256 received = bonusTokenAddr.balanceOf(address(this)) - balanceBefore;
     // endTime is based on how much tokens transfered v.s. planned weekly rewards
-    uint256 endTime = (received / bonus.weeklyRewards) * WEEK + bonus.endTime;
+    uint256 endTime = received * WEEK / bonus.weeklyRewards + bonus.endTime;
 
     pools[_lpToken].bonuses[_poolBonusId].endTime = endTime;
     pools[_lpToken].bonuses[_poolBonusId].remBonus = bonus.remBonus + received;
@@ -218,24 +232,22 @@ contract BonusRewards is IBonusRewards, Ownable, ReentrancyGuard {
   ) external override onlyOwner notPaused {
     // add pools
     for (uint256 i = 0; i < _lpTokens.length; i++) {
-      Pool memory pool = pools[_lpTokens[i]];
-      require(pool.lastUpdatedAt == 0, "BonusRewards: pool exists");
-      pools[_lpTokens[i]].lastUpdatedAt = block.timestamp;
-      poolList.push(_lpTokens[i]);
-    }
+      address _lpToken = _lpTokens[i];
+      Pool memory pool = pools[_lpToken];
+      if (pool.lastUpdatedAt == 0) {
+        pools[_lpToken].lastUpdatedAt = block.timestamp;
+        poolList.push(_lpToken);
+      }
 
-    // add bonus tokens and their authorizers (who are allowed to add the token to pool)
-    for (uint256 i = 0; i < _bonusTokenAddrs.length; i++) {
-      allowedTokenAuthorizers[_bonusTokenAddrs[i]] = _authorizers;
-      bonusTokenAddrMap[_bonusTokenAddrs[i]] = 1;
-    }
-  }
-
-  /// @notice use start and end to avoid gas limit in one call
-  function updatePools(uint256 _start, uint256 _end) external override {
-    address[] memory poolListCopy = poolList;
-    for (uint256 i = _start; i < _end; i++) {
-      updatePool(poolListCopy[i]);
+      // add bonus tokens and their authorizers (who are allowed to add the token to pool)
+      for (uint256 j = 0; j < _bonusTokenAddrs.length; j++) {
+        address _bonusTokenAddr = _bonusTokenAddrs[j];
+        require(pools[_bonusTokenAddr].lastUpdatedAt == 0, "BonusRewards: lpToken, not allowed");
+        allowedTokenAuthorizers[_lpToken][_bonusTokenAddr] = _authorizers;
+        if (bonusTokenAddrMap[_bonusTokenAddr] == 0) {
+          bonusTokenAddrMap[_bonusTokenAddr] = 1;
+        }
+      }
     }
   }
 
@@ -243,19 +255,19 @@ contract BonusRewards is IBonusRewards, Ownable, ReentrancyGuard {
   function collectDust(address _token, address _lpToken, uint256 _poolBonusId) external override onlyOwner {
     require(pools[_token].lastUpdatedAt == 0, "BonusRewards: lpToken, not allowed");
 
-    uint256 balance = IERC20(_token).balanceOf(address(this));
-    if (bonusTokenAddrMap[_token] == 1) {
-      // bonus token
-      Bonus memory bonus = pools[_lpToken].bonuses[_poolBonusId];
-      require(bonus.bonusTokenAddr == _token, "BonusRewards: wrong pool");
-      require(bonus.endTime + WEEK < block.timestamp, "BonusRewards: not ready");
-      balance = bonus.remBonus;
-      pools[_lpToken].bonuses[_poolBonusId].remBonus = 0;
-    }
-
     if (_token == address(0)) { // token address(0) = ETH
       payable(owner()).transfer(address(this).balance);
     } else {
+      uint256 balance = IERC20(_token).balanceOf(address(this));
+      if (bonusTokenAddrMap[_token] == 1) {
+        // bonus token
+        Bonus memory bonus = pools[_lpToken].bonuses[_poolBonusId];
+        require(bonus.bonusTokenAddr == _token, "BonusRewards: wrong pool");
+        require(bonus.endTime + WEEK < block.timestamp, "BonusRewards: not ready");
+        balance = bonus.remBonus;
+        pools[_lpToken].bonuses[_poolBonusId].remBonus = 0;
+      }
+
       IERC20(_token).transfer(owner(), balance);
     }
   }
@@ -267,6 +279,24 @@ contract BonusRewards is IBonusRewards, Ownable, ReentrancyGuard {
   function setPaused(bool _paused) external override {
     require(_isAuthorized(msg.sender, responders), "BonusRewards: caller not responder");
     paused = _paused;
+  }
+
+  /// @notice update pool's bonus per staked token till current block timestamp, do nothing if pool does not exist
+  function _updatePool(address _lpToken) private {
+    Pool storage pool = pools[_lpToken];
+    uint256 poolLastUpdatedAt = pool.lastUpdatedAt;
+    if (poolLastUpdatedAt == 0 || block.timestamp <= poolLastUpdatedAt) return;
+    pool.lastUpdatedAt = block.timestamp;
+    uint256 lpTotal = IERC20(_lpToken).balanceOf(address(this));
+    if (lpTotal == 0) return;
+
+    for (uint256 i = 0; i < pool.bonuses.length; i ++) {
+      Bonus storage bonus = pool.bonuses[i];
+      if (poolLastUpdatedAt < bonus.endTime && bonus.startTime < block.timestamp) {
+        uint256 bonusForTime = _calRewardsForTime(bonus, poolLastUpdatedAt);
+        bonus.accRewardsPerToken = bonus.accRewardsPerToken + bonusForTime / lpTotal;
+      }
+    }
   }
 
   function _updateUserWriteoffs(address _lpToken) private {
@@ -310,10 +340,11 @@ contract BonusRewards is IBonusRewards, Ownable, ReentrancyGuard {
       uint256 rewardsWriteoffsLen = _user.rewardsWriteoffs.length;
       Bonus[] memory bonuses = pools[_lpToken].bonuses;
       for (uint256 i = 0; i < bonuses.length; i++) {
-        uint256 rewardsWriteoff = rewardsWriteoffsLen == i ? 0 : _user.rewardsWriteoffs[i];
+        uint256 rewardsWriteoff = rewardsWriteoffsLen <= i ? 0 : _user.rewardsWriteoffs[i];
         uint256 bonusSinceLastUpdate = _user.amount * bonuses[i].accRewardsPerToken / CAL_MULTIPLIER - rewardsWriteoff;
-        if (bonusSinceLastUpdate > 0) {
-          uint256 transferred = _safeTransfer(bonuses[i].bonusTokenAddr, bonusSinceLastUpdate); // transfer bonus tokens to user
+        uint256 toTransfer = bonuses[i].remBonus < bonusSinceLastUpdate ? bonuses[i].remBonus : bonusSinceLastUpdate;
+        if (toTransfer > 0) {
+          uint256 transferred = _safeTransfer(bonuses[i].bonusTokenAddr, toTransfer);
           pools[_lpToken].bonuses[i].remBonus = bonuses[i].remBonus - transferred;
         }
       }
